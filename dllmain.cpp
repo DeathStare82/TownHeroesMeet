@@ -11,7 +11,7 @@ PatcherInstance* _PI;
 
 bool inTownDlg;
 
-// 새 버튼에 부여할 고유 ID (타운 다이얼로그 내부에서 중복되지 않는 ID)
+// 새 버튼에 부여할 고유 ID
 #define BTN_HEROES_MEET_ID 8888
 
 // 타운 메시지 프로시저 후킹
@@ -38,8 +38,8 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
             {
                 if (!existingBtn) 
                 {
-                    // 두 영웅 초상화 사이 위치 (X: 302, Y: 295 - 타운 레이아웃 기준 좌표)
-                    // 교류 아이콘 DEF 파일: "i_meet.def" 또는 "i_swap.def" (기본 게임 UI 리소스 사용)
+                    // 두 영웅 초상화 사이 위치 (X: 302, Y: 295)
+                    // 교류 아이콘 DEF: "i_swap.def"
                     _DlgButton_* meetBtn = _DlgButton_::Create(302, 295, 32, 32, BTN_HEROES_MEET_ID, "i_swap.def", 0, 1, 0, 28, 0);
                     if (meetBtn) 
                     {
@@ -50,15 +50,16 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
             } 
             else if (existingBtn) 
             {
-                // 영웅이 한 명이라도 나가면 버튼 제거
+                // 영웅이 떠나면 버튼 제거
                 tm->dlg->RemoveItem(existingBtn);
                 delete existingBtn;
                 tm->dlg->Redraw();
             }
         }
 
-        // 2. 마우스 클릭 이벤트 처리 (버튼 클릭 시)
-        if (msg->type == MT_MOUSECLICK && msg->subtype == BTN_HEROES_MEET_ID) 
+        // 2. 마우스 클릭 / 커스텀 이벤트 처리
+        // HoMM3 다이얼로그 이벤트에서 512(0x200) 및 13(0x0D)은 마우스/버튼 선택 메시지입니다.
+        if ((msg->type == 512 || msg->type == 13 || msg->type == 32) && msg->subtype == BTN_HEROES_MEET_ID) 
         {
             int heroU_id = tm->town->up_hero_id;
             int heroD_id = tm->town->down_hero_id;
@@ -111,7 +112,7 @@ void Dlg_TownHeroesMeet(PatcherInstance* _PI)
     _PI->WriteLoHook(0x4AAC1B, Y_Dlg_HeroesMeet);
 }
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID LPReserved)
 {
     static bool plugin_On = false;
 
