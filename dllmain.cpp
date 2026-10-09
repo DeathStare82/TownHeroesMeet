@@ -23,7 +23,7 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
 
     if (result) 
     {
-        // 1. 타운 화면 진입 및 갱신 시 버튼이 없으면 추가 생성
+        // 1. 타운 화면 진입 및 갱신 시 버튼 처리
         if (tm && tm->dlg) 
         {
             _DlgItem_* existingBtn = tm->dlg->GetItem(BTN_HEROES_MEET_ID);
@@ -39,7 +39,6 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
                 if (!existingBtn) 
                 {
                     // 두 영웅 초상화 사이 위치 (X: 302, Y: 295)
-                    // 교류 아이콘 DEF: "i_swap.def"
                     _DlgButton_* meetBtn = _DlgButton_::Create(302, 295, 32, 32, BTN_HEROES_MEET_ID, "i_swap.def", 0, 1, 0, 28, 0);
                     if (meetBtn) 
                     {
@@ -50,15 +49,13 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
             } 
             else if (existingBtn) 
             {
-                // 영웅이 떠나면 버튼 제거
-                tm->dlg->RemoveItem(existingBtn);
-                delete existingBtn;
+                // 영웅이 떠나면 버튼 비활성화 및 숨김 처리
+                existingBtn->Hide();
                 tm->dlg->Redraw();
             }
         }
 
-        // 2. 마우스 클릭 / 커스텀 이벤트 처리
-        // HoMM3 다이얼로그 이벤트에서 512(0x200) 및 13(0x0D)은 마우스/버튼 선택 메시지입니다.
+        // 2. 마우스 클릭 및 버튼 이벤트 처리 (512: Mouse/Click, 13: Command)
         if ((msg->type == 512 || msg->type == 13 || msg->type == 32) && msg->subtype == BTN_HEROES_MEET_ID) 
         {
             int heroU_id = tm->town->up_hero_id;
@@ -112,7 +109,7 @@ void Dlg_TownHeroesMeet(PatcherInstance* _PI)
     _PI->WriteLoHook(0x4AAC1B, Y_Dlg_HeroesMeet);
 }
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID LPReserved)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
     static bool plugin_On = false;
 
