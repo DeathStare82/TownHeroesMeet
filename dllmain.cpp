@@ -2,7 +2,7 @@
 
 #include "homm3.h"
 #include "era.h"
-#include "patcher_x86.h"
+#include "patcher_x86.hpp"
 
 using namespace Era;
 
