@@ -49,12 +49,8 @@ int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
                             *(int*)((int)o_WndMgr + 8) = (int)o_MouseMgr;
                         }
 
-                        hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 1;
-
                         heroU->TeachScholar(heroD);
                         o_AdvMgr->SwapHeroes(heroU, heroD);
-
-                        hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 0;
 
                         o_TownMgr->UnHighlightArmy();        
                         o_TownMgr->Redraw();    
