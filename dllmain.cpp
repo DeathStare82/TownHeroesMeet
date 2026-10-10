@@ -9,6 +9,8 @@ using namespace Era;
 constexpr auto BUTTON_ID = 200;
 constexpr LPSTR HMS_DEF_NAME = "townhrtd.def";
 constexpr LPSTR HMS_PCX_NAME = "Townhrtr.pcx";
+constexpr LPSTR HMS_BUTTON_HINT = "wnd.dlg_town.hms_button.hint";
+constexpr LPSTR HMS_BUTTON_RMC = "wnd.dlg_town.hms_button.rmc";
 Patch *blockScreenUpdate = nullptr;
 
 int __stdcall Y_DlgTown_Proc(HiHook *hook, _TownMgr_ *tm, _EventMsg_ *msg)
@@ -96,7 +98,7 @@ _LHF_(TownDlg_GetItemHint)
 {
     if (c->edi == BUTTON_ID)
     {
-        c->edi = reinterpret_cast<int>("영웅 간의 교류");
+        c->edi = reinterpret_cast<int>(Era::tr(HMS_BUTTON_HINT));
         c->return_address = 0x05C82B2;
         return NO_EXEC_DEFAULT;
     }
@@ -108,7 +110,7 @@ _LHF_(TownDlg_GetItemRmcHint)
 {
     if (IntAt(c->ebp + 0x8) && c->edi == BUTTON_ID)
     {
-        b_MsgBoxC("성 안에서 주둔 영웅과 방문 영웅 간의 교류 창을 엽니다.", MBX_RMC, -1, -1);
+        b_MsgBoxC(Era::tr(HMS_BUTTON_RMC), MBX_RMC, -1, -1);
     }
 
     return EXEC_DEFAULT;
