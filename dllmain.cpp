@@ -38,13 +38,11 @@ int __stdcall Y_DlgTown_Proc(HiHook *hook, _TownMgr_ *tm, _EventMsg_ *msg)
 
             o_TownMgr->mgr.isActive = false;
             blockScreenUpdate->Apply();
-            hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 1;
 
             // 교류 실행
             heroU->TeachScholar(heroD);
             o_AdvMgr->SwapHeroes(heroU, heroD);
 
-            hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 0;
             blockScreenUpdate->Undo();
 
             if (switchButton)
@@ -110,7 +108,7 @@ _LHF_(TownDlg_GetItemRmcHint)
 {
     if (IntAt(c->ebp + 0x8) && c->edi == BUTTON_ID)
     {
-        b_MsgBoxC("성 안에서 주둔 영웅과 방문 영웅 간의 교류를 진행합니다.", MBX_RMC, -1, -1);
+        b_MsgBoxC("성 안에서 주둔 영웅과 방문 영웅 간의 교류 창을 엽니다.", MBX_RMC, -1, -1);
     }
 
     return EXEC_DEFAULT;
