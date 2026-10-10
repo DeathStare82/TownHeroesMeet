@@ -6,107 +6,138 @@
 
 using namespace Era;
 
-Patcher* _P;
-PatcherInstance* _PI;
+constexpr auto BUTTON_ID = 200;
+constexpr LPSTR HMS_DEF_NAME = "townhrtd.def";
+constexpr LPSTR HMS_PCX_NAME = "Townhrtr.pcx";
+Patch *blockScreenUpdate = nullptr;
 
-bool inTownDlg;
-
-// 새 버튼에 부여할 고유 ID
-#define BTN_HEROES_MEET_ID 8888
-
-// 타운 메시지 프로시저 후킹
-int __stdcall Y_DlgTown_Proc(HiHook* hook, _TownMgr_* tm, _EventMsg_* msg)
+int __stdcall Y_DlgTown_Proc(HiHook *hook, _TownMgr_ *tm, _EventMsg_ *msg)
 {
-    int result = CALL_2(int, __thiscall, hook->GetDefaultFunc(), tm, msg);
-
-    inTownDlg = false;
-
-    if (result) 
+    if (msg->type == MT_MOUSEBUTTON && msg->subtype == MST_LBUTTONCLICK && msg->item_id == BUTTON_ID)
     {
-        // 1. 타운 화면 진입 및 갱신 시 버튼 처리
-        if (tm && tm->dlg) 
+        const int heroU_id = tm->town->up_hero_id;
+        const int heroD_id = tm->town->down_hero_id;
+        const bool isActive = heroU_id != -1 && heroD_id != -1 && (!o_NetworkGame || o_ActivePlayerID == o_MeID);
+
+        if (isActive)
         {
-            _DlgItem_* existingBtn = tm->dlg->GetItem(BTN_HEROES_MEET_ID);
-            
-            // 두 영웅 존재 여부 확인
-            int heroU_id = tm->town->up_hero_id;
-            int heroD_id = tm->town->down_hero_id;
-            bool bothHeroesExist = (heroU_id != -1 && heroD_id != -1);
+            _Hero_ *heroU = o_GameMgr->GetHero(heroU_id);
+            _Hero_ *heroD = o_GameMgr->GetHero(heroD_id);
 
-            // 상단/하단 영웅이 모두 있을 때만 버튼 표시
-            if (bothHeroesExist) 
-            {
-                if (!existingBtn) 
-                {
-                    // 두 영웅 초상화 사이 위치 (X: 302, Y: 295)
-                    _DlgButton_* meetBtn = _DlgButton_::Create(302, 295, 32, 32, BTN_HEROES_MEET_ID, "i_swap.def", 0, 1, 0, 28, 0);
-                    if (meetBtn) 
-                    {
-                        tm->dlg->AddItem(meetBtn);
-                        tm->dlg->Redraw();
-                    }
-                }
-            } 
-            else if (existingBtn) 
-            {
-                // 영웅이 떠나면 버튼 비활성화 및 숨김 처리
-                existingBtn->Hide();
-                tm->dlg->Redraw();
-            }
-        }
+            o_TownMgr->mgr.SetManagers(&o_AdvMgr->mgr, &o_WndMgr->mgr);
+            o_AdvMgr->mgr.SetManagers(nullptr, &o_WndMgr->mgr);
+            o_WndMgr->mgr.SetManagers(&o_TownMgr->mgr, &o_MouseMgr->mgr);
 
-        // 2. 마우스 클릭 및 버튼 이벤트 처리 (512: Mouse/Click, 13: Command)
-        if ((msg->type == 512 || msg->type == 13 || msg->type == 32) && msg->subtype == BTN_HEROES_MEET_ID) 
-        {
-            int heroU_id = tm->town->up_hero_id;
-            int heroD_id = tm->town->down_hero_id;
+            _DlgItem_ *switchButton = tm->dlg->GetItem(BUTTON_ID);
+            _DlgItem_ *closeDlgbutton = tm->dlg->GetItem(ID_OK_10);
 
-            if (heroU_id != -1 && heroD_id != -1) 
-            {
-                _Hero_* heroU = o_GameMgr->GetHero(heroU_id);
-                _Hero_* heroD = o_GameMgr->GetHero(heroD_id);
+            if (switchButton)
+                switchButton->Hide();
+            if (closeDlgbutton)
+                closeDlgbutton->Hide();
 
-                inTownDlg = true;
+            o_TownMgr->mgr.isActive = false;
+            blockScreenUpdate->Apply();
+            hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 1;
 
-                if (*(int*)((int)o_ExecMgr + 4) != (int)o_WndMgr) 
-                {
-                    *(int*)((int)o_TownMgr + 4) = (int)o_AdvMgr;
-                    *(int*)((int)o_TownMgr + 8) = (int)o_WndMgr;
+            // 교류 실행
+            heroU->TeachScholar(heroD);
+            o_AdvMgr->SwapHeroes(heroU, heroD);
 
-                    *(int*)((int)o_AdvMgr + 4) = NULL;
-                    *(int*)((int)o_AdvMgr + 8) = (int)o_WndMgr;            
+            hdv(_bool_, "HotA.SwapMgrCalledFromTown") = 0;
+            blockScreenUpdate->Undo();
 
-                    *(int*)((int)o_WndMgr + 4) = (int)o_TownMgr;
-                    *(int*)((int)o_WndMgr + 8) = (int)o_MouseMgr;
-                }
+            if (switchButton)
+                switchButton->Show();
+            if (closeDlgbutton)
+                closeDlgbutton->Show();
 
-                heroU->TeachScholar(heroD);
-                o_AdvMgr->SwapHeroes(heroU, heroD);
-
-                o_TownMgr->UnHighlightArmy();        
-                o_TownMgr->Redraw();    
-
-                inTownDlg = false;
-            }
+            o_TownMgr->mgr.isActive = true;
+            o_TownMgr->UnHighlightArmy();
+            o_TownMgr->Redraw();
         }
     }
 
-    return result;
+    return CALL_2(int, __thiscall, hook->GetDefaultFunc(), tm, msg);
 }
 
-int __stdcall Y_Dlg_HeroesMeet(LoHook* h, HookContext* c)
-{    
-    if (inTownDlg) { 
-        c->return_address = 0x4AAC2A;
-        return NO_EXEC_DEFAULT;
+void __stdcall GarrisonInterface_SetGraphics(HiHook *hook, const DWORD harrisonInterface, const int redraw, const int selectedCreatureID)
+{
+    const auto *tm = o_TownMgr;
+    if (tm && tm->town && tm->dlg && tm->dlg == o_WndMgr->dlg_last)
+    {
+        _DlgItem_ *switchButton = tm->dlg->GetItem(BUTTON_ID);
+        if (switchButton)
+        {
+            const int heroU_id = tm->town->up_hero_id;
+            const int heroD_id = tm->town->down_hero_id;
+            const bool isActive = heroU_id != -1 && heroD_id != -1 && (!o_NetworkGame || o_ActivePlayerID == o_MeID);
+            CALL_2(void, __thiscall, 0x05FEF00, switchButton, isActive);
+        }
     }
+    return CALL_3(void, __thiscall, hook->GetDefaultFunc(), harrisonInterface, redraw, selectedCreatureID);
+}
+
+_LHF_(TownDlg_Create)
+{
+    if (_Dlg_ *dlg = reinterpret_cast<_Dlg_ *>(c->edi))
+    {
+        constexpr int width = 59;
+        constexpr int height = 20;
+        constexpr int x = 269 - width / 2;
+        constexpr int y = 466 - height / 2;
+        
+        dlg->AddItemToOwnArrayList(_DlgStaticPcx8_::Create(x - 1, y - 1, -1, HMS_PCX_NAME));
+        dlg->AddItemToOwnArrayList(_DlgButton_::Create(x, y, width, height, BUTTON_ID, HMS_DEF_NAME, 0, 1, 0, HK_E, 2));
+    }
+
     return EXEC_DEFAULT;
 }
 
-void Dlg_TownHeroesMeet(PatcherInstance* _PI)
+_LHF_(TownDlg_GetItemHint)
 {
+    if (c->edi == BUTTON_ID)
+    {
+        c->edi = reinterpret_cast<int>("영웅 간의 교류");
+        c->return_address = 0x05C82B2;
+        return NO_EXEC_DEFAULT;
+    }
+
+    return EXEC_DEFAULT;
+}
+
+_LHF_(TownDlg_GetItemRmcHint)
+{
+    if (IntAt(c->ebp + 0x8) && c->edi == BUTTON_ID)
+    {
+        b_MsgBoxC("성 안에서 주둔 영웅과 방문 영웅 간의 교류를 진행합니다.", MBX_RMC, -1, -1);
+    }
+
+    return EXEC_DEFAULT;
+}
+
+void __stdcall Y_Dlg_HeroesMeetCreate(HiHook *hook, const _WndMgr_ *wndMgr, _Dlg_ *dlg, const int order, const int draw)
+{
+    CALL_4(int, __thiscall, hook->GetDefaultFunc(), wndMgr, dlg, order, draw);
+    if (dlg)
+    {
+        if (_DlgButton_ *closeDlgbutton = reinterpret_cast<_DlgButton_ *>(dlg->GetItem(ID_OK_10)))
+        {
+            closeDlgbutton->SetHotKey(HK_ESC);
+        }
+    }
+}
+
+void Dlg_TownHeroesMeet(PatcherInstance *_PI)
+{
+    blockScreenUpdate = _PI->WriteHexPatch(0x04AAC21, "90 90 90 90 90 90 90 90 90");
+
+    _PI->WriteLoHook(0x05C5C57, TownDlg_Create);
     _PI->WriteHiHook(0x5D3640, SPLICE_, EXTENDED_, THISCALL_, Y_DlgTown_Proc);
-    _PI->WriteLoHook(0x4AAC1B, Y_Dlg_HeroesMeet);
+    _PI->WriteHiHook(0x05AA0C0, SPLICE_, EXTENDED_, THISCALL_, GarrisonInterface_SetGraphics);
+    _PI->WriteLoHook(0x05C7D4B, TownDlg_GetItemHint);
+    _PI->WriteLoHook(0x05D475B, TownDlg_GetItemRmcHint);
+    _PI->WriteHiHook(0x05AED58, CALL_, EXTENDED_, THISCALL_, Y_Dlg_HeroesMeetCreate);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
@@ -117,8 +148,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     {
         plugin_On = true;
 
-        _P = GetPatcher();
-        _PI = _P->CreateInstance("TownHeroesMeetPlugin");
+        Patcher *_P = GetPatcher();
+        PatcherInstance *_PI = _P->CreateInstance("TownHeroesMeetPlugin");
 
         ConnectEra();
         Dlg_TownHeroesMeet(_PI);
